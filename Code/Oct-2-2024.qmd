@@ -1,0 +1,12 @@
+---
+title: "Oct-2-2024"
+format: html
+---
+
+```{r}
+rm(list=ls())
+library(here)
+library(tidyverse)
+```
+
+
