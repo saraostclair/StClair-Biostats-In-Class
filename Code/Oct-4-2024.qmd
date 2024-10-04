@@ -1,0 +1,91 @@
+---
+title: "Oct-4-2024"
+format: html
+---
+
+```{r}
+rm(list=ls())
+library(here)
+library(tidyverse)
+```
+
+```{r}
+drug_df <- read.csv(here("Data", "drug_resistance.csv"))
+str(drug_df)
+
+drug_df$Treatment <- as.factor(drug_df$Treatment)
+```
+
+```{r}
+levels(drug_df$Treatment)
+```
+
+Fix treatment levels
+find rows with any version of "control"
+use which() function
+```{r}
+fix <-which(drug_df$Treatment %in% c("cantrol", "control", "Control"))
+# indentified rows needing repair
+
+drug_df$Treatment[fix] <-"control"
+
+drug_df$Treatment <- factor(drug_df$Treatment) #tells R to re-list the levels of my facotr now that they have changes
+levels(drug_df$Treatment)
+```
+
+Fix treatment levels
+find rows with any version of "drug x 2"
+use which() function
+```{r}
+fix1 <-which(drug_df$Treatment %in% c("drug x 2", "drug2", "Drugx2"))
+# indentified rows needing repair
+
+drug_df$Treatment[fix1] <-"drug2"
+
+drug_df$Treatment <- factor(drug_df$Treatment) #tells R to re-list the levels of my facotr now that they have changes
+levels(drug_df$Treatment)
+```
+
+Fix treatment levels
+find rows with any version of "drug x 3"
+use which() function
+```{r}
+fix2 <-which(drug_df$Treatment %in% c("drug x 3", "Drug x 3", "drug3"))
+# indentified rows needing repair
+
+drug_df$Treatment[fix2] <-"drug3"
+
+drug_df$Treatment <- factor(drug_df$Treatment) #tells R to re-list the levels of my facotr now that they have changes
+levels(drug_df$Treatment)
+```
+
+
+fix tech_name
+```{r}
+levels(drug_df$tech.name)
+drug_df$tech.name <- as.factor(drug_df$tech.name)
+```
+
+Becca
+```{r}
+fix3 <-which(drug_df$tech.name %in% c("becca", "Becca"))
+# indentified rows needing repair
+
+drug_df$tech.name[fix3] <-"Becca"
+
+drug_df$tech.name <- factor(drug_df$tech.name) #tells R to re-list the levels of my facotr now that they have changes
+levels(drug_df$tech.name)
+```
+
+Brian
+```{r}
+fix4 <-which(drug_df$tech.name %in% c("brain", "brian", "Brian"))
+# indentified rows needing repair
+
+drug_df$tech.name[fix4] <-"Brian"
+
+drug_df$tech.name <- factor(drug_df$tech.name) #tells R to re-list the levels of my facotr now that they have changes
+levels(drug_df$tech.name)
+```
+
+
