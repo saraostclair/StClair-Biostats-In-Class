@@ -3,23 +3,93 @@ title: "October-7-2024"
 format: html
 ---
 
-## Quarto
-
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
-
-## Running Code
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
-
+Plant number: integer discrete
+treatment: categorical(factor): nominal
+num_flower: integer : integer discrete
+tomato_yeild_fruits: integer : discrete
+avg_tomato_weight: dbl : ratio: double continous 
 ```{r}
-1 + 1
+rm(list=ls())
+library(tidyverse)
+library(here)
 ```
 
-You can add options to executable code like this 
-
+load in data
 ```{r}
-#| echo: false
-2 * 2
+tomatoes<- read.csv(here("Data", "tomato_data.csv"))
+glimpse(tomatoes)
 ```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+## make treatment a factor
+```{r}
+tomatoes$Treatment <- as.factor(tomatoes$Treatment)
+glimpse(tomatoes)
+```
+
+## levels of treatment
+```{r}
+levels(tomatoes$Treatment)
+```
+
+## fix control
+```{r}
+fix <-which(tomatoes$Treatment == "control")
+# indentified rows needing repair
+
+tomatoes$Treatment[fix] <-"Control"
+
+tomatoes$Treatment <- factor(tomatoes$Treatment) #tells R to re-list the levels of my factor now that they have changes
+levels(tomatoes$Treatment)
+```
+
+
+## fix fertilizer 
+```{r}
+fix1 <-which(tomatoes$Treatment =="fertilizer")
+# indentified rows needing repair
+
+tomatoes$Treatment[fix1] <-"Fertilizer"
+
+tomatoes$Treatment <- factor(tomatoes$Treatment) #tells R to re-list the levels of my factor now that they have changes
+levels(tomatoes$Treatment)
+```
+
+now look at summary function
+```{r}
+test<- c(2,4,6,8,10,12,14,16,18,20)
+summary(test)
+```
+
+```{r}
+grades <- c(90,94,96,90,84,86)
+mean <- (90+94+96+90+84+86)/6
+median<- 90
+min<- 84
+max<- 96
+range<- max-min
+firstqu<- range * 0.25 + min
+thirdqu <- max -(range *.025)
+mean
+median
+min
+maxrange
+firstqu
+thirdqu
+summary(grades)
+```
+
+```{r}
+quantile(grades, probs = c(0, 0.25, 0.5, 0.75, 1))
+
+```
+
+practicing dyplr
+```{r}
+tomatoes |> select(Num_flowers)
+
+tomatoes |> slice(3:8)
+
+tomatoes |> filter(Treatment == "Control")
+
+```
+
