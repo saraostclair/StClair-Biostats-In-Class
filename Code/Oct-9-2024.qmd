@@ -1,0 +1,23 @@
+---
+title: "Oct-9-2024"
+format: html
+---
+
+```{r}
+rm(list=ls())
+library(here)
+library(tidyverse)
+```
+
+```{r}
+tomato<- read.csv(here("Data", "tomato_data.csv"))
+```
+
+```{r}
+tomato |> slice(c(3,7,9))
+```
+
+```{r}
+tomato |> filter( Avg_tomato_weight_g >= 145)
+```
+
