@@ -1,0 +1,197 @@
+---
+title: "rabies.qmd"
+format: html
+editor: visual
+---
+
+## Rabies project
+
+You are receiving a dataset from the New York State Department of Health that shows test results for specimens submitted to be tested for rabies.
+
+Your goals are twofold:
+
+-   To practice using the material from Chapter 3 of GSWR and
+-   To learn something about rabies in New York.
+
+## Set things up and read in the data
+
+```{r}
+rm(list=ls())
+library(here)
+library(tidyverse)
+```
+
+Add the code to set up the workspace
+
+Now read in the data and name it as an object called `rabies`.
+
+```{r}
+
+rabies<- read.csv(here("Data", "Rabies_Laboratory_Submissions.csv"))
+
+```
+
+## Get started
+
+Use a combination of filter, select, slice, arrange, group_by, summarize, mutate or any other functions covered in Chapter 3 of GSWR to answer the following questions about this data set.
+
+1.  After you read in all of the data, create a new data frame called rabies that includes just the first 7 columns (omit latitude, longitude and geocode information) from the original dataset.
+
+```{r}
+
+rabies<- rabies |> select(1:7)
+
+```
+
+2.  Create a new column in your dataset called "Percent_pos" and set it equal to (number of
+
+```{r}
+rabies <- rabies |> 
+  mutate(Percent_pos = Positive.Samples / Number.of.Samples * 100)
+```
+
+*After you have taken care of tasks 1 and 2, you may wish to divide up the work among your group members by assigning different questions to different team members. **Each team member should work from a different branch on the project and should submit their suggested changes via a pull request.***
+
+3.  In what year was the highest total number of sample submissions received? (Hint: you might want the `sum()` function)
+
+```{r}
+    rabies |> group_by(Received.Year) |>
+      summarise(n_submissions = sum(Number.of.Samples)) |>
+      arrange(desc(n_submissions)) |>
+      slice(1)
+
+```
+
+4.  In what year and in what county was the highest positive number of samples received?
+
+```{r}
+rabies |> group_by(Received.Year, County.Name) |>
+      summarise(n_positives = sum(Positive.Samples)) |>
+      arrange(desc(n_positives))  |>
+      ungroup() |>
+      slice(1)
+```
+
+5.  How many rows of data are there that include submissions from bats for which the samples were positive for rabies? For which the samples were not positive for rabies?
+
+```{r}
+rabies |> filter(Positive.Samples > 0) |>
+  nrow()
+
+rabies |> filter(Positive.Samples == 0) |>
+  nrow()
+```
+
+6.  How many animal types were there for which, in instances in which there were more than 4 samples submitted at a time, the percent of positive samples was greater than 50%?
+
+```{r}
+rabies |> filter(Number.of.Samples > 4 ) |>
+  filter(Percent_pos > 50) |>
+  group_by(Animal.Classification) |>
+  nrow()
+```
+
+7.  Create a new dataset that includes only data from St. Lawrence County and name it SLC. Next, calculate, by Animal.Classification, the total number of submissions per year, the total number of positive submissions per year, and then the percent positive per year based on those two totals. Save your results in a new data frame called SLC_animals.
+
+```{r}
+SLC <- rabies |> 
+  filter(County.Name == "St. Lawrence")
+
+SLC_animals <- SLC |> 
+  group_by(Animal.Classification) |> 
+  mutate(total_submissions = sum(Number.of.Samples)) |> 
+  mutate(total_positive_submissions = sum(Positive.Samples)) |> 
+  mutate(percent_positive = total_positive_submissions/total_submissions)
+SLC_animals
+```
+
+8.  Create a new dataset that includes only data from St. Lawrence County from 2020 to present. Name the dataset `SLC_recent`.
+
+```{r}
+SLC_recent <- SLC |> 
+  filter(Received.Year >= 2020) 
+```
+
+9.  What was the animal type for which the highest percent of submitted samples tested positive by year in your St. Lawrence County dataset? What is the average percent positive by year?
+
+```{r}
+SLC_animals |> 
+  group_by(Animal.Classification) |> 
+  arrange(desc(percent_positive)) |> 
+  ungroup() |> 
+  slice(1)
+
+SLC_animals |> 
+  group_by(Received.Year) |> 
+  summarise(average_percent_positive = mean(percent_positive))
+##Animal type with the highest percent of positive samples is Rodents.
+```
+
+When you have finished working on your questions, save your changes and commit them. Working from your branch (and not *main*), push your changes to your repository and then open a Pull Request to have the changes incorporated into your group repository.
+
+## Plots
+
+```{r}
+graph<- rabies |> group_by(Received.Year, Animal.Classification)
+ggplot(graph, aes(x= Received.Year, y = Number.of.Samples, colour = Animal.Classification))+
+  geom_col()
+```
+
+```{r}
+ggplot(rabies, aes(x = Animal.Classification, y = Percent_pos)) +
+  geom_boxplot() +
+  labs(title = "Distribution of Positive Percentage by Animal Classification", x = "Animal Classification", y = "Positive Percentage")
+
+```
+
+```{r}
+ggplot(rabies, aes(x = Received.Month, y = Animal.Classification, fill = Number.of.Samples)) +
+  geom_tile() +
+  labs(title = "Samples by Animal Classification and Month", x = "Month", y = "Animal Classification")
+
+```
+
+```{r}
+ggplot(rabies, aes(x = Number.of.Samples, y = Positive.Samples)) +
+  geom_point() +
+  labs(title = "Number of Samples vs Positive Samples", x = "Number of Samples", y = "Positive Samples")
+
+```
+
+```{r}
+ggplot(rabies, aes(x = Received.Year, y = Number.of.Samples, group = 1)) +
+  geom_line() +
+  labs(title = "Number of Samples Over the Years", x = "Year", y = "Number of Samples")
+
+```
+
+```{r}
+ggplot(rabies, aes(x = Animal.Classification, y = Number.of.Samples, fill = Animal.Classification)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Total Samples by Animal Classification", x = "Animal Classification", y = "Number of Samples")
+
+```
+
+```{r}
+animal_summary <- rabies |>
+  group_by(Received.Year, Animal.Classification) |>
+  summarise(
+    total_samples = sum(Number.of.Samples),
+    total_positive_samples = sum(Positive.Samples),
+    mean_percent_pos = mean(Percent_pos)) 
+animal_summary
+
+```
+
+```{r}
+
+ggplot(animal_summary, aes(x = Animal.Classification, y = mean_percent_pos)) +
+  geom_boxplot() +
+  geom_jitter(color = "gray") + 
+  labs(
+    x = "Animal type",
+    y = "Mean percent positive samples"
+  ) +
+  theme_minimal()
+
+```
