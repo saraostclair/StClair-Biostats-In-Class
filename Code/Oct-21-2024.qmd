@@ -1,0 +1,65 @@
+---
+title: "21 Oct 2024 - review"
+format: html
+editor: visual
+---
+
+Download the dataset called "birds_and_mammals.csv" from today's module and put it in your Data folder.
+
+Set up your workspace and read in the .csv. Name it "critters"
+
+```{r}
+rm(list = ls())
+library(here)
+library(tidyverse)
+critters <- read.csv(here("Data","birds_and_mammals.csv"))
+```
+
+Filter just for mammals in the order Carnivora and make a new dataset called "carnivores"
+
+```{r}
+carnivores<- critters |> filter(Order == "Carnivora")
+glimpse(carnivores)
+```
+
+create a histogram of maximum longevity for carnivores.
+
+```{r}
+ggplot(carnivores, aes(max_longevity_years)) +
+  geom_histogram(bins = 15)
+```
+
+Now make a scatterplot comparing max_longevity_years vs. adult_wt_g
+
+```{r}
+ggplot(carnivores, aes(y=max_longevity_years, x=adult_wt_g)) +
+  geom_point()
+```
+
+Use code (rather than scrolling the data) to determine which species it is that has the highest maximum longevity?
+
+```{r}
+carnivores |> arrange(desc(max_longevity_years)) |>
+  select(Species, max_longevity_years) |>
+  slice(1)
+```
+
+Use code to determine the two species between 2.5e+05 and 3e+05 in adult body mass.
+
+```{r}
+carnivores  |>
+  filter(adult_wt_g >= 2.5e+05 & adult_wt_g <= 3e+05) |>
+  select(Species)
+```
+
+Now make a boxplot of max longevity as a function of family. Set the y-axis label to "maximum longevity, years". Make the points red and somewhat transparent.
+
+```{r}
+ggplot(carnivores, aes(y = max_longevity_years, x=Family)) +
+  geom_boxplot() +
+ geom_jitter(aes(colour = family), width = 0.2, alpha = 0.4, color = "red")
+```
+
+
+
+
