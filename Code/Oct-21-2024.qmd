@@ -59,7 +59,3 @@ ggplot(carnivores, aes(y = max_longevity_years, x=Family)) +
   geom_boxplot() +
  geom_jitter(aes(colour = family), width = 0.2, alpha = 0.4, color = "red")
 ```
-
-
-
-
