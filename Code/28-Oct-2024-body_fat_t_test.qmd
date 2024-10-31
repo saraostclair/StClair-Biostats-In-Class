@@ -5,6 +5,7 @@ date: "2022-10-27"
 ---
 
 ## Reviewing the t-test
+
 ```{r}
 library(here)
 library(tidyverse)
@@ -12,7 +13,6 @@ body<- read.csv(here("Data", "body_fat_percentage.csv"))
 glimpse(body)
 body$gender<- as.factor(body$gender)
 ```
-
 
 Let's conduct a 2-sample t-test to compare body fat percentage between men and women.
 
@@ -23,32 +23,34 @@ The data set presents the body fat percentage for a sample of men and women who 
 Use the information you learned from reading chapter 5 and doing homework 21 to conduct a t-test comparing mean body fat percentage between the male and female groups. But don’t just rush to the test – follow the recommended analysis workflow:
 
 1.  Plot the data and look at expected relationships
+
 ```{r}
 ggplot(body, aes(body_fat_percent))+
   geom_histogram(binwidth = 10)+
-  facet_wrap(~ gender)
+  facet_wrap(~ gender, ncol = 1)
 
-ggplot(body, aes(body_fat_percent, y= subject))+
-  geom_boxplot()+
-  facet_wrap(~gender)
 ```
 
 2.  Calculate the mean and standard deviation for the data and examine the resulting output.
+
 ```{r}
 body|> group_by(gender)|>
-  summarise(mean_sex= mean(body_fat_percent),
-            sd_sex = sd(body_fat_percent))
+  summarise(mean_sex= mean(body_fat_percent, na.rm = TRUE),
+            sd_sex = sd(body_fat_percent, na.rm= TRUE)) 
 ```
 
 3.  Discuss with your partner:
+
     -   Review in the book: What are the assumptions about the data appropriate for a t-test? When you examine the plots and summary data, do they appear to meet those assumptions?
-    we have numeric and continuous data so assumptions are met 
-    -   Based on examination of the plots and summary data, do you expect that there is a statistically significant difference in mean body fat percentage between males and females in this sample?
-    yes
-    
+
+    we have numeric and continuous data so assumptions are met need equal variance and normality
+
+    -   Based on examination of the plots and summary data, do you expect that there is a statistically significant difference in mean body fat percentage between males and females in this sample? yes
+
 4.  Conduct a t-test and then interpret the results. What do they tell you about the null vs. alternative hypotheses?
+
 ```{r}
-t.test(body_fat_percent ~ gender, data = body)
+t.test(body_fat_percent ~ gender, data = body) 
 ```
 
 we reject the null hypothesis that there is no significant difference in body fat percentage between sexes. We would fail to reject the alternative hypothesis their true difference in means between group female and group male is not equal to 0

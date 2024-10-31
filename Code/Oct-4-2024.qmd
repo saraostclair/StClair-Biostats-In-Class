@@ -25,11 +25,11 @@ find rows with any version of "control"
 use which() function
 ```{r}
 fix <-which(drug_df$Treatment %in% c("cantrol", "control", "Control"))
-# indentified rows needing repair
+# identified rows needing repair
 
 drug_df$Treatment[fix] <-"control"
 
-drug_df$Treatment <- factor(drug_df$Treatment) #tells R to re-list the levels of my facotr now that they have changes
+drug_df$Treatment <- factor(drug_df$Treatment) #tells R to re-list the levels of my factor now that they have changes
 levels(drug_df$Treatment)
 ```
 
