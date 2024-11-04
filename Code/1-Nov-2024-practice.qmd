@@ -31,6 +31,40 @@ The researchers wished to know if there was an association between plant height 
 Your task is to determine the appropriate statistical test you should use to answer this question from the data and then proceed with the statistical analysis, using the "plot your data (and guess the answer!) -\> build your model -\> check your assumptions -\> interpret your model" workflow (for now, we will leave out the last step which is to make a better plot at the end).
 
 I am expecting that you will document your process clearly along the way.
+```{r}
+#clean up data
+glimpse(morio)
+morio$treatment<- as.factor(morio$treatment)
+morio$plant_ht_class<- as.factor(morio$plant_ht_class)
+```
+
+```{r}
+#make dataset
+q1<- morio |> select(treatment, spur_length_mm)
+q1
+```
+
+type of data
+spure length = response and continuous 
+treatment = predictor categorical 
+
+test to run is a t test
+```{r}
+ggplot(morio, aes(x=spur_length_mm))+
+  geom_histogram()+
+  facet_wrap(~treatment)
+```
+Assumptions
+- data looks pretty normal and equal variance has been met 
+- looking to see if there is a difference between group and if there is it is small
+- peaks are both at about 10
+
+```{r}
+t.test(spur_length_mm ~ treatment, data = morio)
+```
+
+- 95% CI does not include 0 indicates there is a difference between groups
+Reject the null hypothesis that there is no significant difference in spur length between hand pollinated and control as the p-value is less than 0.5
 
 ### Question 2
 
@@ -39,10 +73,77 @@ The researchers wished to know if there was an association between plant height 
 Your task is to determine the appropriate statistical test you should use to answer this question from the data and then proceed with the statistical analysis, using the "plot your data (and guess the answer!) -\> build your model -\> check your assumptions -\> interpret your model" workflow (for now, we will leave out the last step which is to make a better plot at the end).
 
 I am expecting that you will document your process clearly along the way.
+```{r}
+#makedata set
+q2<- morio |> select(plant_ht_class, treatment, num_flowers)
+q2
+```
+
+response is number of flowers produced by orchid plants
+predictors are plant height class and treatment group
+chi square goodness of fit test
+
+```{r}
+#organize data for plotting and analysis
+totals<- morio |> group_by(plant_ht_class, treatment)|>
+  summarise(total.numer = sum(num_flowers))
+totals
+```
+
+```{r}
+#plot
+ggplot(totals, aes(x=plant_ht_class, y= total.numer, fill = treatment))+
+  geom_bar(stat = 'identity', position = 'dodge')
+```
+
+- looks like there is a different between short and tall plants whether they were the control or hand pollinated 
+
+```{r}
+lady.mat<- xtabs(num_flowers ~ plant_ht_class + treatment, data = morio)
+```
+
+```{r}
+chisq.test(lady.mat)
+```
+
+reject alternative hypothesis as p-value is greater than 0.05 there is no association between plant height class and treatment group and the number of flowers produced by orchid plants.
 
 ### Question 3
 
-The researchers wished to know if there is an association between corolla area and spur length in hand-pollinated flowers.
+The researchers wished to know if there is an association between corolla area and spur length in hand-pollinated flowers. 
+
+both are continuous predictors are seeing there is a association so will be preforming a regression 
+
+```{r}
+q3<- morio |> filter(treatment == "hand-pollinated")
+q3
+```
+
+```{r}
+ggplot(q3, aes(x=corolla_area_mm2, y=spur_length_mm))+
+  geom_point()
+```
+
+```{r}
+model_pgr<- lm(spur_length_mm ~corolla_area_mm2, data = q3)
+```
+
+
+```{r}
+autoplot(model_pgr, smooth.colour = NA)
+#all assumptions look good
+```
+
+```{r}
+anova(model_pgr)
+```
+
+```{r}
+summary(model_pgr)
+```
+
+reject null hypothesis that there is no association between plant height class and treatment group and the number of flowers produced by orchid plants
+
 
 Your task is to determine the appropriate statistical test you should use to answer this question from the data and then proceed with the statistical analysis, using the "plot your data (and guess the answer!) -\> build your model -\> check your assumptions -\> interpret your model" workflow (for now, we will leave out the last step which is to make a better plot at the end).
 
