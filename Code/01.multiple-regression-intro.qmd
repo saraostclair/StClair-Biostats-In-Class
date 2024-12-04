@@ -1,0 +1,421 @@
+---
+title: "Multiple glm regression"
+format: html
+editor: visual
+---
+
+
+## Multiple Regression
+
+Multiple linear regression makes the same assumptions about our predictor variables as simple bivariate linear regression, which are that:
+
+-   The data have a linear (vs. non-linear) relationship.
+
+-   The data are normally distributed
+
+-   The residual values (remember, these are the measures of the distance between the actual points and the predicted regression line) have constant variance for each level of the predictor variable.
+
+Let's walk through a multiple regression example:
+
+-   Step 1 - plot the response variable
+
+-   Step 2 - evaluate predictor variables
+
+-   Step 3 - guesstimate predictors
+
+-   Step 4 - Fit all possible models ("best subsets")
+
+-   Step 5 - Choose the best model
+
+-   Step 6 - Run and interpret the best model
+
+In our example, we will look at data from my own research camera trapping data. We are going to look and see which habitat variables are the best predictors of mammal species diversity.
+
+## Examine response and predictor variables
+
+Start by setting things up
+
+```{r}
+rm(list = ls())
+library(tidyverse)
+library(here)
+library(Hmisc) #for testing significance of correlations
+library(GGally) #for making pairwise plots of variables
+library(corrplot) #for looking at correlation matrices
+library(ggcorrplot) #for plotting correlation matrices
+library(performance) #for checking model performance
+library(broom) #for tidying regression output
+library(leaps) #allows best subsets linear regression
+library(MASS) #for stepAIC function
+library(data.table) #for confidence intervals
+library(here)
+camera<- read.csv(here("Data", "camera_covariates_50hectares.csv"))
+```
+
+Now let's pull in some data.
+
+We're using a file called `camera_covariates_50hectares.csv`. These data present the diversity of mammal species as detected from camera traps set up in forests around the North Country in 2017-2018.
+
+The variable div_shan is the Shannon index of mammal diversity at each camera trap location.
+
+ForestSimpson, ForestShannon, and ForestSR are the diversity indices for the trees at each forest where a camera was located. We used GIS to determine habitat variables at a 50 hectare scale around each camera. The 50-hectare scale represents the typical home range size for many medium sized mammals like porcupines and raccoons.
+
+```{r}
+cams <- read.csv(here("Data/camera_covariates_50hectares.csv"), stringsAsFactors = T)
+```
+
+Now look at the data and notice that we have a combination of categorical and continuous predictor variables. Our response variables is div_shan.
+
+Remember that for regression, we need complete cases, so let's get that next.
+
+```{r}
+cams <- cams[complete.cases(cams),]
+```
+
+We end up with 55 rows and 30 variables!
+
+The first column, cam-sd, just provides a unique identifier for the camere that the data correspond to.
+
+Now let's rearrange our data a bit so that the response variable, div_shan, comes next
+
+```{r}
+cams <- cams %>% relocate(div_shan, .after = cam_sd)
+```
+
+### Step 1 - Plot response variables
+
+Let's looks at our response variable
+
+```{r}
+ggplot(cams, aes(div_shan))+
+  geom_histogram()
+range(cams$div_shan, na.rm = T)
+```
+
+Looks more-or-less normal but has quite a few zeroes.
+
+### Step 2 - Evaluate predictor variables.
+
+We now have the data set set up so that columns 3:30 represent possible predictor variables. Now our task is to see if any of those predictor variables are highly correlated with one another. We don't want to use predictor variables in a model when they are highly correlated. The rule of thumb is that variables with correlation coefficients \> 0.7 (positive or negative) are too highly correlated.
+
+We can't get correlations with categorical variables. So let's pull the factor variables to the left of the data frame and specify the remaining columns for the correlation test.
+
+```{r}
+cams <- cams %>% relocate(Cam_Model, .after = Season)
+```
+
+Now colums 7:30 are numeric predictors. Let's take a look at how correlated they are.
+
+```{r}
+cor_tests <- cor(cams[,7:30], method = "pearson")
+cor_tests <- round(cor_tests, 2) #round for easier viewing
+```
+
+Now we need to know which of the correlations are statistically significant. To do so requires `rcorr` function from `Hmisc` package.
+
+```{r}
+cor_tests_results <- rcorr(as.matrix(cams[,7:30]))
+```
+
+The result is a big list - let's flatten it to make it easier to understand the results.
+
+Use this little function (copy this whole block of code into your own code if you plan to use the function and don't alter it!).
+
+```{r}
+flattenCorrMatrix<-function(cormat,pmat){
+  ut<-upper.tri(cormat)
+  data.frame(
+    row = rownames (cormat)[row(cormat) [ut]],
+    column = rownames(cormat)[col(cormat)[ut]],
+    cor = (cormat)[ut],
+    p = pmat[ut]
+  )
+}
+```
+
+Now let's use the function
+
+```{r}
+cam_table <- flattenCorrMatrix(cor_tests_results$r, cor_tests_results$P)
+```
+
+The gives us all of the pairwise correlations among variables and their associated p-values. We only care about the ones that have correlation coefficients \>= 0.7. Let's filter for those.
+
+```{r}
+highly_correlated <- cam_table %>% filter(cor >= 0.7 | cor <= -0.7)
+```
+
+We went from 276 rows to 11 rows!
+
+Let's take a look
+
+```{r}
+View(highly_correlated)
+```
+
+The 3 forest diversity indices, Shannon, Simpson and Species Richness are all highly correlated, so we will just use ForestShannon in our possible models.
+
+Mean tree density, seedling and sapling density and total density are all highly correlated, so we'll just use total density.
+
+Same for dominanance.
+
+Percent evergreen is negatively correlated with percent deciduous so we'll drop percent evergreen.
+
+Percent forest is negatively correlated with percent wetlandso we'll drop percent wetland.
+
+So now let's drop the variables that are highly correlated from our dataframe.
+
+```{r}
+drop <- c("ForestSimpson", "ForestSR", "meanTreeDensity", "meanSeedlingSaplingDensity", "meanTreeDominance", "meanSeedlingSaplingDensity", "P_Evergreen50","P_Wetland50")
+
+cams <- cams %>% select(-drop)
+```
+
+Now we have 55 observations and 23 variables, of which 21 are possible predictor variables. That is still a LOT of predictor variables! Let's write that result to use in our models.
+
+### Step 3 - Guesstimate predictors
+
+We can take a look at how highly correlated our response variable is with our numeric predictor variables to make a guess as to which predictors might be important and likely to be included in our model.
+
+```{r}
+predictor_cors <- data.frame(cor(cams[,7:23], cams$div_shan))
+predictor_cors <- predictor_cors %>% rename(correlation = cor.cams...7.23...cams.div_shan.)
+
+predictor_cors %>% arrange(desc(correlation)) %>% View()
+```
+
+Looks like the variables with the highest correlation to mammal shannon diversity are the percent of agricultural habiat, the percent of shrub habitat and the mean tree/seedling/sapling density which all have a positive correlation greater than 0.2 and the number of deer, which has a negative correlation at -0.1988. I expect these may be the most likey variables to appear in my model.
+
+Let's plot some of those relationships:
+
+```{r}
+ggplot(cams, aes(P_Agriculture50, div_shan))+
+  geom_point()
+```
+
+We see that there are a LOT of zeroes for this variable which may be problematic.
+
+```{r}
+ggplot(cams, aes(P_Shrub50, div_shan))+
+  geom_point()
+```
+
+Again, lots of zeroes. But might be positively trending.
+
+```{r}
+ggplot(cams, aes(MeanAllDensity, div_shan))+
+  geom_point()
+```
+
+Notice a big gap here between lower and higher densities, with nothing in between.
+
+```{r}
+ggplot(cams, aes(NumDeer, div_shan))+
+  geom_point()
+```
+
+Ok - so we've looked at some of the relationships among the variables. Now let's move on to model building.
+
+## Fitting the multiple regression models
+
+First, let's clear our workspace and set things up and pull in the data that we cleaned during the last script `02.Examine-the-response-predictor-vars.qmd`. The dataset is called `cleaned_cam_data.csv`. This file corresponds to steps 4 - 6 delineated in `01.multiple-regression-intro.qmd`
+
+We're going to look at something called "best subsets regression" which looks at all possible models and determines which models are best. There are a variety of ways to implement best subsets regression – we will use the method from the `leaps` package.
+
+### Step 4 - Fit all possible models
+
+We will look at two methods, one called "best subsets regression" and the other called "stepwise regression".
+
+#### Method 1 - Build your best subsets regressions
+
+We need a matrix that just has our one response variable and our predictor variables, but no other coding variables.
+
+Currently, the variable cam_sd is not a variable we want to consider for our model, so let's drop it.
+
+```{r}
+preds <- cams %>% dplyr::select(-cam_sd)
+```
+
+Now build the models
+
+```{r}
+all_subsets.mods <-regsubsets(
+  preds$div_shan ~ ., #specifies the model and . tells it to use all predictors
+  data = preds,
+  nbest = 1 #tells it to pick the one best model for each number of predictors
+  )
+all_subsets.mods
+all_summary <-summary(all_subsets.mods)
+outmat<- as.data.frame(all_summary$outmat)
+all_summary$adjr2
+```
+
+We see from the adjusted R2 values that the model with 8 predictors has the highest R2 value.
+
+We can plot some figures to look at the results
+
+```{r}
+plot(all_subsets.mods, scale = "r2") #plots the R^2 value for each variable across all models
+```
+
+Here's another way, looking at Mallow's Cp, an index we can use for comparing models.
+
+```{r}
+#plotting with base R
+plot(all_summary$cp)
+plot(all_subsets.mods, scale = "Cp")
+```
+
+Be wary of all those negative Mallow's Cp values - they likely suggestion that we have violated an assumption of the test.
+
+Now plot BIC
+
+```{r}
+plot(all_summary$bic)
+plot(all_subsets.mods, scale = "bic")
+```
+
+It looks like the best model is the model with 4 predictors in it. That model has Season-Spring, Season-Winter, mean seedling/sapling/tree density and P_shrub50 as predictors. If we assume Season-Spring and Season-Winter are from the same categorical predictor, Spring, and we then look at a 4th predictor, it would be NumDeer.
+
+#### Method 2 - Stepwise regression
+
+In this method, we start by defining the intercept-only model:
+
+```{r}
+m.intercept_only <- glm(preds$div_shan ~ 1, data = preds)
+```
+
+Next we define the model with all predictors
+
+```{r}
+m.all.preds <- glm(preds$div_shan ~ ., data = preds)
+```
+
+Now we perform the stepwise regression to move through.
+
+```{r}
+m.stepwise <- step(m.intercept_only, direction = "both", scope = formula(m.all.preds))
+```
+
+This method returns a slightly different best model with 4 predictors,but this time they are Season, P_Shrub50, MeanAllDensity and NumDeer. Note that this is the same result as above if we consider Season as a single predictor and not season-spring and season-winter
+
+#### Stepwise with the stepAIC function
+
+Let's try another way to do stepwise with stepAIC method.
+
+First, build the full model
+
+```{r}
+full <- glm(div_shan~ ., family = gaussian, data = preds)
+summary(full)
+```
+
+Now we can begin the stepwise procedure
+
+```{r}
+step <- stepAIC(full, trace = F)
+step$anova
+```
+
+We get a slightly different final model here, with Season, NumDeer, P_Shrub50 like the other models, but P_Deciduous rather than MeanAllDensity as the 4th predictor.
+
+We can compare those final models to one another in this way by first creating each of them
+
+```{r}
+mod_best <- lm(div_shan ~ Season + MeanAllDensity + P_Shrub50, data = preds)
+
+mod_step <- lm(div_shan ~ Season + MeanAllDensity + NumDeer + P_Shrub50, data = preds)
+
+mod_stepAIC <- lm(div_shan ~ Season + NumDeer + P_Deciduous50 + P_Shrub50, data = preds)
+```
+
+Now we can compare those 3 models
+
+```{r}
+AIC(mod_best, mod_step, mod_stepAIC)
+```
+
+These models are all within 2 AIC units of one another which means they are more-or-less equivalent.
+
+Let's use the `performance` package to compare these models to one another.
+
+```{r}
+performance(mod_best)
+performance(mod_step)
+performance(mod_stepAIC)
+
+```
+
+mod_step has a slightly higher adjusted R2 so we'll go with it, since these models are more-or-less equivalent. Sigma is a measure of the residual standard error and it measures model accuracy - lower values of RSE are better.
+
+### Steps 5 and 6 - Choose and then run and interpret the best model
+
+According to BIC and adjusted R2, our model with 4 predictors is best. So let's look at that final model.
+
+#### Create the final model
+
+```{r}
+final_mod <- lm(div_shan ~ Season + MeanAllDensity + NumDeer + P_Shrub50, data = preds)
+summary(final_mod)
+anova(final_mod)
+```
+
+From our `summary` call we see that the overall model is highly significant (F = 4.47 with 6 and 68 df, p = 0.00114).
+
+We can see from the coefficients that Shannon diversity is negatively related to Season (with Spring being statistically significant and winter showing borderline significance). There is a positive relationship between the percent of shrubs in the 50-hectare area, but it also has a very modest slope.
+
+We can again use the `performance` package to check our final model. This gives a nice visual on how well our model fits assumptions. Looks good! (it may give you a message in the console about needing to install package `see` - choose yes!)
+
+```{r}
+check_model(final_mod)
+```
+
+#### Make a final plot
+
+It would be very challenging to plot this model, as we have 4 variables in the model and we can't plot in 4 dimensional space.
+
+But we could get a couple of plots to look at since we have 4 variables and one is categorical.
+
+To do so, we will use the `broom` package to tidy up regression results (by putting them into data frames) so that we can more easily work with them.
+
+```{r}
+coefs <- tidy(final_mod)
+coefs
+```
+
+Now get confidence interval
+
+```{r}
+ci <- data.table(confint(final_mod), keep.rownames = 'term')
+```
+
+Now combine coefs and ci
+
+```{r}
+cidf <- cbind(coefs, ci)
+cidf
+```
+
+```{r}
+colnames(cidf)
+cidf <-cidf[,-6] #got rid of second term column
+
+cidf <-cidf %>% rename(
+  "lower" = "2.5 %",
+  "upper" = "97.5 %"
+)
+
+cidf$term <- as.factor(cidf$term)
+```
+
+Now we can make a plot
+
+```{r}
+ggplot(cidf, aes(estimate, term))+
+  geom_vline(xintercept = 0, linetype = 2)+
+  geom_point(size = 3)+
+  geom_errorbarh(aes(xmax = lower, xmin = upper), height = 0.2)+
+  theme_bw()
+```
+
+This plot shows us the confidence intervals for each term in our model - those that do not include zero for the estimate are statistically significant. You can see that, in this example, when the season is spring, there is a significant negative effect on detected mammal diversity and when the percent shrubs in the habitat increases, there is a signficant and very modest increase in diversity.

@@ -3,3 +3,74 @@ title: "Nov_4"
 format: html
 ---
 
+```{r}
+rm(list=ls())
+library(here)
+library(tidyverse)
+library(ggfortify)
+```
+
+```{r}
+tree<- read.csv(here("Data", "Forest_Tree_DBH_F21.csv"))
+glimpse(tree)
+tree$Forest<- as.factor(tree$Forest)
+```
+
+```{r}
+ggplot(tree, aes(x=Forest, y=DBH_cm))+
+  geom_boxplot()+
+  geom_jitter(width = 0.01)+
+  theme_bw()+
+  coord_flip()
+```
+
+```{r}
+ model_width<- lm(DBH_cm~Forest, data = tree)
+```
+
+```{r}
+autoplot(model_width)
+#everything looks good
+```
+
+```{r}
+anova(model_width)
+#can reject null hypothesis but note that the f value is small
+```
+
+```{r}
+summary(model_width)
+#degrasse serves as the intercept as it is first alphabetically 
+```
+
+```{r}
+tree |>
+  group_by(Forest)|>
+  summarise(meanGR = mean(DBH_cm))
+
+```
+
+
+## Difference between what groups
+```{r}
+library(multcomp)
+```
+
+```{r}
+#tukeyHSD
+phc1<- glht(model_width, linfct = mcp(Forest = "Tukey"))
+summary(phc1)
+```
+
+Compact letter display
+```{r}
+cld(phc1)
+#same letter means not significant 
+```
+
+
+```{r}
+library(emmeans)
+
+```
+

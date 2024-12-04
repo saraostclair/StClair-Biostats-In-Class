@@ -1,0 +1,37 @@
+---
+title: "Nov-20-2024"
+format: html
+---
+
+```{r}
+rm(list=ls())
+library(here)
+library(tidyverse)
+```
+
+```{r}
+cams<- read.csv(here("Data", "site_locations.csv"))
+species<- read.csv(here("Data", "species_per_site.csv"))
+```
+
+```{r}
+sp_wide<- species |>
+  pivot_wider(names_from = Date,
+              values_from = Num_species)
+```
+
+```{r}
+sp_long<- sp_wide |>
+  pivot_longer(cols = c(`1-Jul-24` : `15-Jul-24`), names_to= "Date", values_to = "Num_Species")
+```
+
+**Join Data Frame**
+
+```{r}
+cams_species<- full_join(species, cams)
+```
+
+```{r}
+site_species<- full_join(cams, species)
+```
+
