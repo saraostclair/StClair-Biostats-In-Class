@@ -1,0 +1,346 @@
+---
+title: "GLM part 1"
+format: html
+editor: visual
+---
+
+## Getting Started with Generalized Linear Models
+
+### Setting up
+
+```{r}
+rm(list = ls())
+library(here)
+library(tidyverse)
+library(ggfortify)
+```
+
+### 7.1 Introduction
+
+What do we do when our data violate assumptions of `lm`?
+
+For example, *count data* and *proportion* *data* are common in biology, and usually don't meet the assumption of normality.
+
+We often count the number of individuals, or cases, or species, etc.
+
+We usually want to relate those counts to other variables.
+
+Count data are bounded between zero and infinity, violate the normallity assumption and don't have a constant mean-variance relationship. Thus they typically are not well suited to `lm` methods.
+
+Date relating to proportions are also common. A common type of data records whether an event happens, such as does an animal die, does a plant flower, or is a species living in a grid cell? Or we may collect data on sex ratios. Once again, we want to relate these response variables to some predictor. Is the death rate related to amount of pesticide applied, for example?
+
+These types of questions involve a response variable that is either binary or another kind of count. We ask how the probability of an event occuring (live or die, number of individuals that lived or died, etc.) depends on the explanatory variable.
+
+Because these sorts of data all violate the assumptions of a general linear model (`lm`) we need to introduce the solution: a *generalized linear model*.
+
+#### Key terms for GLM models
+
+1.  *Family* = The family is the probability distribution that is assumed to describe the response variable (aka the *error structure*). The Poisson and binomial are examples of families.
+
+2.  *Linear predictor* - Just like in a linear model, there is a linear predictor, that is an equation that describes how the different predictor variable(s) affect the expected value of the response variable.
+
+3.  *Link function* - The link function describes the mathematical relationship between the expected value of the response variable and the linear predictor - it links the response and predictor variables.
+
+### Count and Rate Data often follow a Poisson Distribution
+
+Our goal is to understand how the rate of occurrence of the response variable (e.g. counts of babies produced) depends on the explanatory variable(s).
+
+Our response variable is counts of offspring from Soay sheep ewes.
+
+We're going to assume we have counts of sheep born to ewes and their average body mass. The question is whether bigger mommas produce more babies?
+
+Let's read in some data
+
+```{r}
+soay <- read.csv(here("Data/SoaySheepFitness.csv"), stringsAsFactors = T)
+glimpse(soay)
+```
+
+Let's look at the response variable, fitness:
+
+```{r}
+ggplot(soay, aes(fitness))+
+  geom_histogram()+
+  theme_bw()
+```
+
+Now let's plot the data and look at a linear vs. non-linear line seem to fit the data.
+
+```{r}
+#1st just points
+ggplot(soay, aes(body.size, fitness))+
+    geom_point()+
+      xlab("Body mass (kg)")+
+      ylab("lifetime fitness")
+  
+#now lm fit
+ggplot(soay, aes(body.size, fitness))+
+  geom_point()+
+  geom_smooth(method = "lm", se = F)+ #plots linear relationshiop
+  xlab("Body mass (kg)")+
+  ylab("lifetime fitness")
+
+ggplot(soay, aes(body.size, fitness))+
+  geom_point()+
+  geom_smooth(method = "lm", se = F)+ #plots linear relationshiop
+  geom_smooth(span = 1, color = "red", se = F)+ #adds non-linear curve
+  xlab("Body mass (kg)")+
+  ylab("lifetime fitness")
+```
+
+Clearly looking at the blue line, it doesn't capture the data as well as the red line. A linear relationship doesn't seem the best fit.
+
+Let's first do the analysis "wrong" with a `lm` and then do it "right" with `glm`.
+
+### 7.3 Doing it wrong
+
+Let's generate the model and get the plots to check the assumptions
+
+```{r}
+soay_lm <- lm(fitness~body.size, data = soay)
+autoplot(soay_lm)
+```
+
+The "U" shape in the plot of residuals vs. fitted values tells us that a linear model fails to account for the curvature in the relationship b/w our y and x variables.
+
+The Normal Q-Q plot also shows some issues. Notice how far the points fall from the line at the upper and lower ends of the theoretical quantiles.
+
+This is happening because we have right-skewed residuals. We see this if we plot a histogram of the response variable:
+
+```{r}
+ggplot(soay, aes(fitness))+
+  geom_histogram()
+```
+
+#### 7.3.2. The Poisson Distribution - a solution
+
+Now [take a look at some probability distributions](https://statdist.ksmzn.com/)
+
+Before running the analysis, I'd like to get a couple of summary stats
+
+```{r}
+soay_summary <- soay %>% summarise(
+  mean_fitness = mean(fitness, na.rm = T),
+  sd_fitness = sd(fitness, na.rm = T)
+)
+View(soay_summary)
+anova(soay_lm)
+summary(soay_lm)
+```
+
+The Poisson distribution is a good starting point for certain kinds of count data. Look at 3 different views of the Poisson distribution, each with a different mean.
+
+The Poisson distribution is good for data whose upper value is unbounded (the lower value is assumed to be zero).
+
+### 7.4 Doing it right - the Poisson GLM
+
+#### 7.4.1 Anatomy of a glm
+
+We call our models linear because we are "adding up" all of the pieces of the model (the y-intercept and the slope term).
+
+When conducting a glm, instead of modeling the predicted values of the response directly, we model the mathematical transformation of the prediction. The function that does this is called the link function.
+
+A linear model does not mean a linear relationship. The link function, which transforms the prediction, can allow for that.
+
+#### 7.4.2 Doing it right - actually fitting the model
+
+Let's try a Poisson glm to see if we can get a better fit.
+
+To construct a glm, we need to specify the family.
+
+```{r}
+soay_glm <- glm(fitness ~ body.size, data = soay, family = poisson)
+```
+
+Since we didn't specify the link function, R will choose what it thinks is the best default, which, in this case, is the log link function for Poisson models.
+
+#### 7.4.3 Doing it right - the diagnostics
+
+Use our same system for diagnostics:
+
+```{r}
+autoplot(soay_glm)
+```
+
+If our chosen family is a good fit for the data, then our diagnostics should operate like those from a model with normally distributed errors. So we don't need any new skills to evaluate our plots.
+
+#### 7.4.4 Doing it right - `anova()` and `summary()`
+
+Now let's look at the model output
+
+```{r}
+anova(soay_glm)
+```
+
+The total deviance in the data is 85.081 and the deviance related to body size is 37.041 deviance units, almost half of the variation in the data relates to body size.
+
+We didn't get p-values. We need to specify the probability distribution in order to get them. With a typical glm, p values come from the Chi-square distribution. (note that we are not doing a chi-square test).
+
+So if we specify the distribution, we can get a p-value:
+
+```{r}
+anova(soay_glm, test = "Chisq")
+```
+
+Now let's look at coefficients:
+
+```{r}
+summary(soay_glm)
+```
+
+In the deviance table at the bottom, the null deviance is like "all of the variation in the data" and the residual deviance is a measure of what is left over in variation once the model is fit. So, the smaller the residual deviance, the more that the variation is explained by the predictor.
+
+when we look at the coefficients, we see that the intercept is negative, but we can't actually have a negative number of sheep born. Remember the log link function - our glm is predicting the natural log of lifetime reproductive success and not actual LRS. If we want to account for the number of lambs a particular sized ewe is expected to produce, we need to back-transform our results:
+
+e^(-2.422+0.541x5)^
+
+Where we plugged in 5 to see what the result would be for a 5 lb ewe.
+
+#### 7.4.5 Making a nice final plot!
+
+We use `expand.grid()` to generate a set of "new x" values remembering to name the single column the same as in the original data set (`body.size`)
+
+```{r}
+min.size <- min(soay$body.size)
+max.size <- max(soay$body.size)
+```
+
+Now make the new body size column
+
+```{r}
+new.x <- expand.grid(
+  body.size = seq(min.size, max.size, length = 1000)
+  )
+```
+
+Now we can generate the fits and standard errors at new.x values
+
+```{r}
+new.y <- predict(soay_glm, newdata = new.x, se.fit = T)
+new.y <- data.frame(new.y)
+head(new.y)
+```
+
+Now we need to put the new x values and new y values together into the same data frame
+
+```{r}
+addThese <- data.frame(new.x, new.y)
+addThese <- rename(addThese, fitness = fit)
+```
+
+Now we need to add confidence interval data
+
+```{r}
+addThese <- mutate(addThese,
+                   lwr = fitness - 1.96 + se.fit,
+                   upr = fitness + 1.96 + se.fit)
+
+```
+
+Now we can plot
+
+```{r}
+ggplot(soay, aes(body.size, fitness))+
+  geom_point(size = 3, alpha = 0.5)+
+  #now add the fits and the CIs 
+  geom_smooth(data = addThese, aes(ymin = lwr, ymax = upr), stat = "identity")+
+  theme_bw()
+  
+```
+
+Doesn't look good, becasue when we used `predict()` it uses the scale of the link function, which is a log scale. So this means the predictions are the log of expected fitness. We want predictions of actual fitness.
+
+Go back to addThese and get a back-transformed version of the y-axis variables.
+
+```{r}
+new.x <- expand.grid(body.size = seq(min.size, max.size,length = 1000))
+```
+
+Now generate fits and standard errors on the new.x variable
+
+```{r}
+new.y <- predict(soay_glm, newdata = new.x, se.fit = T)
+new.y <- data.frame(new.y)
+```
+
+Now bring them together into a new addThese
+
+```{r}
+addThese <- data.frame(new.x, new.y)
+```
+
+Now exponentiate the fitness and CI's to get back to the response variable scale (number of sheep)
+
+```{r}
+addThese <- mutate(addThese, 
+                   fitness = exp(fit),
+                   lwr = exp(fit - 1.96 * se.fit),
+                   upr = exp(fit + 1.96 * se.fit))
+head(addThese)
+```
+
+And now plot
+
+```{r}
+ggplot(soay, aes(body.size, fitness))+
+  geom_point(size = 3, alpha = 0.5)+
+  #now add the fits and the CIs 
+  geom_smooth(data = addThese, aes(ymin = lwr, ymax = upr), stat = "identity")+
+  theme_bw()
+```
+
+### 7.5 When a Poisson isn't good for counts
+
+#### 7.5.1 The overdispersion problem
+
+Overdispersion is stats lingo for "extra variation."
+
+Some glm models make strong assumptions about the nature of variability in your data. Both the Poisson and binomial do, for example. The variance in a Poisson distribution is exactly equal to the mean. This will only be true with biological data if we can include every single source of variation in our analysis, which we can never do.
+
+Overdispersion also arises from non-independence in the data. If you have overdispersion and don't account for it, your p-values will be incorrect. And the error is to make the p-values less rather than more conservative, so your likelihood of false positives goes up!
+
+So, before we can address overdispersion, we need to be able to detect it.
+
+Look at the summary for the soay sheep analysis again
+
+```{r}
+summary(soay_glm)
+```
+
+The part we care about is the residual deviance and associated degrees of freedom. When glm is working perfectly and there is no overdispersion these two numbers will be the same.
+
+You can calculate the "dispersion index" by dividing residual deviance by residual DF you want a number close to 1. Greater than 1 = overdispersed, \< 1 = underdispersed.
+
+When should you worry? One rule of thumb is if dispersion index \> 2, begin to worry.
+
+If in doubt, you could try a different kind of model and see if you get better numbers.
+
+One option is to change the family in your glm to a "quasi" version of the family. For example, poisson becomes quasipoisson. The quasi method works exactly like a standard glm but estimates dispersion index and adjusts the p-values accordingly. - If you use the quasi method, you need to be careful with your `anova()` call and tell it `test = "F"` instead of `test = "Chisq"`. Doing so allows R to incorportate the dispersion estimate into the test.
+
+Another fix is to switch to the negative binomial family, which can be considered a more flexible version of the poisson distribution. The variance still increases with the mean, but in a less constrained way - the variance doesn't have to equal the mean. - negative binomials are easy to use, but don't use `glm()`. Instead, we use `glm.nb()` from the `MASS` package instead. `MASS` is part of base R so it doesn't need to be installed.
+
+These 2 methods work well to address overdispersion when it is caused by missing variables. However, the don't work to address overdispersion when it is caused by non-independence of variables. For that, you likely need a mixed model.
+
+#### 7.5.2 Zero inflation
+
+One source of overdispersion on count data is zero inflation - the case that happens when there are more zero values than we expect based on the distribution we're using. If your count is zero-inflated, you often see it with a bar chart of raw counts. If you see a spike at 0, that probabaly (but not always) caused by zero inflation
+
+Biological counts are often zero inflated. This often is the result of a binary process acting in combination with a poisson process. For example, the number of flowers produced on a plant depends on whether the plant is visited by a polinator (binary) and then how many flowers the pollinators visit (poisson).
+
+Zero inflation is best dealt with by using a new model. There are several options available. We'll look at 2:
+
+-   Option 1 is a *mixture model*. This models that data as fitting two distrubtions. They assume each observation in the data comes from one of the two distribtuions. We don't know which, but the math can take care of that for us.
+
+-Option 2 is a *hurdle model*. A hurdle model has two parts - a part for the binary data (all the zeros) and a poisson part for the non-zero values. The poisson part is then modified to only allow for positive values.
+
+The most accessible option is the `pcsl` package which has the `zeroinfl()` and `hurdle()` functions to model zero-inflated data.
+
+#### 7.5.3 Transformations ain't all bad
+
+Before the advent of glm, folks would often transform count (Poisson-like) data with log or square root transformations and then run plain old `lm()`. Then with the advent of `glm()` some folks said no to transformations. These authors are pragmatists and see value in both. There are even some advantages of using transformations, which include: - They often work fine with the data are "far away" from zero - that is, when you don't have zeros but the data also don's span orders of magnitude. - Using a transformation is simple because there are no link functions to worry about. - You don't have to worry about overdispersion. The residual error term takes care of the overdispersion. This can be a big advantage.
+
+Why don't we always use them? - A transformation changes 2 things at once: they alter the mean-variance relationship and the shape of the relationship b/w predictor and response. A transformation might fix one issue and break the other. - Transformations often fail when your count data contain zeros. - The model you build may be difficult to interpret and use because it does not make predictions on the scale you originally measured things on.
+
+### 7.6 Summary, and beyond simple Poisson regression
+
+You did it! There is A LOT in this chapter!

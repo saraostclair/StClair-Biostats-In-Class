@@ -4,7 +4,6 @@ format: html
 editor: visual
 ---
 
-
 ## Multiple Regression
 
 Multiple linear regression makes the same assumptions about our predictor variables as simple bivariate linear regression, which are that:
